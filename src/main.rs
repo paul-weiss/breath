@@ -50,45 +50,55 @@ fn run_app() -> io::Result<()> {
 }
 
 fn show_menu(exercises: &[Exercise]) -> io::Result<Option<usize>> {
-    let mut stdout = stdout();
-    execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0))?;
-
-    println!("\r");
-    println!("  BREATH  ·  James Nestor\r");
-    println!("  {}\r", "─".repeat(52));
-    println!("\r");
-
-    for (i, ex) in exercises.iter().enumerate() {
-        let diff_color = match ex.difficulty {
-            Difficulty::Beginner => Color::Green,
-            Difficulty::Intermediate => Color::Yellow,
-            Difficulty::Advanced => Color::Red,
-        };
-        print!("  {}  {:<36}", i + 1, ex.name);
-        execute!(stdout, SetForegroundColor(diff_color))?;
-        print!("{}", ex.difficulty.label());
-        execute!(stdout, ResetColor)?;
-        println!("\r");
-    }
-
-    println!("\r");
-    println!("  {}\r", "─".repeat(52));
-    println!("  Number to begin  ·  q to quit\r");
-    print!("\r\n  > ");
-    stdout.flush()?;
-
+    let mut input = String::new();
     loop {
+        let mut stdout = stdout();
+        execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0))?;
+
+        println!("\r");
+        println!("  BREATH  ·  James Nestor\r");
+        println!("  {}\r", "─".repeat(52));
+        println!("\r");
+
+        for (i, ex) in exercises.iter().enumerate() {
+            let diff_color = match ex.difficulty {
+                Difficulty::Beginner => Color::Green,
+                Difficulty::Intermediate => Color::Yellow,
+                Difficulty::Advanced => Color::Red,
+            };
+            print!("  {:<3} {:<36}", i + 1, ex.name);
+            execute!(stdout, SetForegroundColor(diff_color))?;
+            print!("{}", ex.difficulty.label());
+            execute!(stdout, ResetColor)?;
+            println!("\r");
+        }
+
+        println!("\r");
+        println!("  {}\r", "─".repeat(52));
+        println!("  Number + Enter to begin  ·  q to quit\r");
+        print!("\r\n  > {}", input);
+        stdout.flush()?;
+
         if let Event::Key(key) = event::read()? {
             if is_quit(&key) {
                 return Ok(None);
             }
-            if let KeyCode::Char(c) = key.code {
-                if let Some(n) = c.to_digit(10) {
-                    let idx = n as usize;
-                    if idx >= 1 && idx <= exercises.len() {
-                        return Ok(Some(idx - 1));
+            match key.code {
+                KeyCode::Enter => {
+                    if let Ok(n) = input.trim().parse::<usize>() {
+                        if n >= 1 && n <= exercises.len() {
+                            return Ok(Some(n - 1));
+                        }
                     }
+                    input.clear();
                 }
+                KeyCode::Char(c) if c.is_ascii_digit() => {
+                    input.push(c);
+                }
+                KeyCode::Backspace => {
+                    input.pop();
+                }
+                _ => {}
             }
         }
     }
@@ -311,7 +321,7 @@ fn show_complete(ex: &Exercise) -> io::Result<()> {
     println!("  Complete.\r");
     execute!(stdout, ResetColor)?;
 
-    if let Some(note) = ex.completion_note {
+    if let Some(note) = ex.completion_note.as_deref() {
         println!("\r");
         for line in note.lines() {
             println!("  {}\r", line);
